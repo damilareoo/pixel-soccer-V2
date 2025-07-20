@@ -12,6 +12,12 @@ const GAME_DURATION = 120 // 2 minutes in seconds
 const GOAL_WIDTH = 12
 const GOAL_HEIGHT = 60
 
+// Ball unstuck constants
+const STUCK_THRESHOLD_SPEED = 0.1 // Ball speed below this is considered stuck
+const STUCK_CORNER_DISTANCE = 20 // Distance from corner to consider it stuck
+const STUCK_DURATION_MS = 500 // How long before we intervene (milliseconds)
+const UNSTUCK_FORCE = 2 // Force to apply to unstuck the ball
+
 // Retro Color Palette
 const COLORS = {
   background: "#222034", // Dark background for overall app
@@ -59,6 +65,9 @@ function BrazilianSoccerGame({
   useEffect(() => {
     timeLeftRef.current = timeLeft
   }, [timeLeft])
+
+  // Ref to track if the ball is stuck
+  const ballStuckTimerRef = useRef<number | null>(null)
 
   // Game objects using refs to avoid re-renders
   // Adjusted initial Y positions to account for the new top UI bar
@@ -908,6 +917,35 @@ function BrazilianSoccerGame({
 
           ball.speedY += (Math.random() - 0.5) * 2
         }
+      }
+
+      // Ball unstuck mechanism
+      const isBallSlow = Math.abs(ball.speedX) < STUCK_THRESHOLD_SPEED && Math.abs(ball.speedY) < STUCK_THRESHOLD_SPEED
+      const isBallInCorner =
+        (ball.x < STUCK_CORNER_DISTANCE && ball.y < STUCK_CORNER_DISTANCE) || // Top-left
+        (ball.x + ball.width > GAME_WIDTH - STUCK_CORNER_DISTANCE && ball.y < STUCK_CORNER_DISTANCE) || // Top-right
+        (ball.x < STUCK_CORNER_DISTANCE && ball.y + ball.height > GAME_HEIGHT - STUCK_CORNER_DISTANCE) || // Bottom-left
+        (ball.x + ball.width > GAME_WIDTH - STUCK_CORNER_DISTANCE &&
+          ball.y + ball.height > GAME_HEIGHT - STUCK_CORNER_DISTANCE) // Bottom-right
+
+      if (isBallSlow && isBallInCorner) {
+        if (ballStuckTimerRef.current === null) {
+          ballStuckTimerRef.current = timestamp
+        } else if (timestamp - ballStuckTimerRef.current > STUCK_DURATION_MS) {
+          // Apply force to push ball towards center
+          const centerX = GAME_WIDTH / 2
+          const centerY = GAME_HEIGHT / 2
+          const dxToCenter = centerX - ball.x
+          const dyToCenter = centerY - ball.y
+          const distToCenter = Math.sqrt(dxToCenter * dxToCenter + dyToCenter * dyToCenter) || 1
+
+          ball.speedX = (dxToCenter / distToCenter) * UNSTUCK_FORCE
+          ball.speedY = (dyToCenter / distToCenter) * UNSTUCK_FORCE
+
+          ballStuckTimerRef.current = null // Reset timer
+        }
+      } else {
+        ballStuckTimerRef.current = null // Reset timer if not stuck
       }
 
       // Draw player (retro blue)
