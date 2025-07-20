@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og"
 
 // Image metadata
-export const alt = "Pixel Soccer: Brazilian Street Soccer Game"
+export const alt = "Pixelated street soccer game with players and buildings"
 export const size = {
   width: 1200,
   height: 630,
@@ -13,7 +13,7 @@ export const contentType = "image/png"
 export default async function Image() {
   // Directly use the blob URL provided for the image
   const imageUrl =
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/pixel%20soccer%20OG.png-N7eT7FBEbqgdUIAO7jAWZWZmp81aJw.jpeg"
+    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/pixel%20soccer%20OG-CI2YEvi55AEMdpYkKDJ43OYCb398iY.png"
 
   // Fetch the image data
   const imageResponse = await fetch(imageUrl)
