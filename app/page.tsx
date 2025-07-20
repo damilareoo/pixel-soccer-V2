@@ -1072,7 +1072,7 @@ function BrazilianSoccerGame({
               className="text-base sm:text-xl mb-2 sm:mb-4 animate-pulse font-bold"
               style={{ color: COLORS.uiText, fontFamily: "'Press Start 2P', monospace" }}
             >
-              {isMobile ? "TAP TO START" : "PRESS START"}
+              {isMobile ? "TAP TO START" : "PRESS SPACE OR CLICK TO START"}
             </p>
 
             <div
