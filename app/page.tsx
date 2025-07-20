@@ -12,11 +12,11 @@ const GAME_DURATION = 120 // 2 minutes in seconds
 const GOAL_WIDTH = 12
 const GOAL_HEIGHT = 60
 
-// Ball unstuck constants
-const STUCK_THRESHOLD_SPEED = 0.1 // Ball speed below this is considered stuck
-const STUCK_EDGE_DISTANCE = 20 // Distance from edge to consider it stuck
-const STUCK_DURATION_MS = 500 // How long before we intervene (milliseconds)
-const UNSTUCK_FORCE = 2.5 // Force to apply to unstuck the ball (slightly increased)
+// Ball unstuck constants (further refined for a definitive fix)
+const STUCK_THRESHOLD_SPEED = 0.05 // Even lower speed threshold
+const STUCK_EDGE_DISTANCE = 10 // Closer distance to edge for detection
+const STUCK_DURATION_MS = 200 // Faster intervention (milliseconds)
+const UNSTUCK_FORCE = 5 // Significantly increased force to push the ball
 
 // Retro Color Palette
 const COLORS = {
@@ -776,15 +776,58 @@ function BrazilianSoccerGame({
       const cpuToBallY = ball.y - cpu.y
       const cpuToBallDist = Math.sqrt(cpuToBallX * cpuToBallX + cpuToBallY * cpuToBallY)
 
-      if (cpuToBallDist > 5) {
-        const cpuSpeed = PLAYER_SPEED * 0.6
-        const aggressionFactor = ball.x > GAME_WIDTH / 2 ? 1 : 0.5
+      // CPU aggression based on ball position (more aggressive in defense)
+      let cpuSpeed = PLAYER_SPEED * 0.6
+      let aggressionFactor = 0.5 // Default less aggressive
 
+      // If ball is on CPU's side and near its goal/edge, be more aggressive
+      const isBallInCpuDefenseZone =
+        ball.x > GAME_WIDTH / 2 && (ball.x > GAME_WIDTH - 60 || ball.y < 40 || ball.y > GAME_HEIGHT - 40)
+      if (isBallInCpuDefenseZone) {
+        cpuSpeed = PLAYER_SPEED * 0.9 // Increase speed
+        aggressionFactor = 1.2 // Increase aggression
+      } else if (ball.x > GAME_WIDTH / 2) {
+        aggressionFactor = 1 // Normal aggression on CPU's half
+      }
+
+      if (cpuToBallDist > 5) {
         const cpuDx = (cpuToBallX / cpuToBallDist) * cpuSpeed * aggressionFactor * speedMultiplier
         const cpuDy = (cpuToBallY / cpuToBallDist) * cpuSpeed * aggressionFactor * speedMultiplier
 
         cpu.x = Math.max(GAME_WIDTH / 2 - 20, Math.min(GAME_WIDTH - cpu.width, cpu.x + cpuDx))
         cpu.y = Math.max(0, Math.min(GAME_HEIGHT - cpu.height, cpu.y + cpuDy))
+      }
+
+      // CPU kick logic (improved for clearing from corners)
+      if (
+        ball.x < cpu.x + cpu.width + 10 && // Check if ball is near CPU
+        ball.x + ball.width > cpu.x - 10 &&
+        ball.y < cpu.y + cpu.height + 10 &&
+        ball.y + ball.height > cpu.y - 10
+      ) {
+        // CPU has a higher chance to kick when ball is in its defense zone
+        const kickChance = isBallInCpuDefenseZone ? 0.08 : 0.03 // Increased chance
+        if (Math.random() < kickChance) {
+          playSound("kick")
+
+          let kickDx = -KICK_POWER // Default kick towards player's goal
+          let kickDy = (Math.random() - 0.5) * KICK_POWER // Random vertical component
+
+          // If ball is in a corner, try to kick it towards the center of the field
+          if (isBallInCpuDefenseZone) {
+            const targetX = GAME_WIDTH / 2
+            const targetY = GAME_HEIGHT / 2
+            const dxToCenter = targetX - (ball.x + ball.width / 2)
+            const dyToCenter = targetY - (ball.y + ball.height / 2)
+            const distToCenter = Math.sqrt(dxToCenter * dxToCenter + dyToCenter * dyToCenter) || 1
+
+            kickDx = (dxToCenter / distToCenter) * KICK_POWER * 1.2 // Stronger kick
+            kickDy = (dyToCenter / distToCenter) * KICK_POWER * 1.2
+          }
+
+          ball.speedX = kickDx
+          ball.speedY = kickDy
+        }
       }
 
       // Update ball position with speed multiplier for consistent physics
@@ -918,27 +961,28 @@ function BrazilianSoccerGame({
         }
       }
 
-      // Ball unstuck mechanism (improved)
+      // Ball unstuck mechanism (definitive fix)
       const isBallSlow = Math.abs(ball.speedX) < STUCK_THRESHOLD_SPEED && Math.abs(ball.speedY) < STUCK_THRESHOLD_SPEED
-      const isBallNearEdge =
+      const isBallNearAnyEdge =
         ball.x < STUCK_EDGE_DISTANCE ||
         ball.x + ball.width > GAME_WIDTH - STUCK_EDGE_DISTANCE ||
         ball.y < STUCK_EDGE_DISTANCE ||
         ball.y + ball.height > GAME_HEIGHT - STUCK_EDGE_DISTANCE
 
-      if (isBallSlow && isBallNearEdge) {
+      if (isBallSlow && isBallNearAnyEdge) {
         if (ballStuckTimerRef.current === null) {
           ballStuckTimerRef.current = timestamp
         } else if (timestamp - ballStuckTimerRef.current > STUCK_DURATION_MS) {
-          // Calculate force to push ball towards the center of the field
+          // Calculate force to push ball directly towards the center of the field
           const centerX = GAME_WIDTH / 2
           const centerY = GAME_HEIGHT / 2
           const dxToCenter = centerX - (ball.x + ball.width / 2)
           const dyToCenter = centerY - (ball.y + ball.height / 2)
           const distToCenter = Math.sqrt(dxToCenter * dxToCenter + dyToCenter * dyToCenter) || 1
 
-          ball.speedX = (dxToCenter / distToCenter) * UNSTUCK_FORCE
-          ball.speedY = (dyToCenter / distToCenter) * UNSTUCK_FORCE
+          // Apply a strong, direct force with a small random nudge
+          ball.speedX = (dxToCenter / distToCenter) * UNSTUCK_FORCE + (Math.random() - 0.5) * 1
+          ball.speedY = (dyToCenter / distToCenter) * UNSTUCK_FORCE + (Math.random() - 0.5) * 1
 
           ballStuckTimerRef.current = null // Reset timer
         }
