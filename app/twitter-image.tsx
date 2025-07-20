@@ -13,7 +13,7 @@ export const contentType = "image/png"
 export default async function Image() {
   // Directly use the blob URL provided for the image
   const imageUrl =
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/pixel%20soccer%20OG-CI2YEvi55AEMdpYkKDJ43OYCb398iY.png" // Updated to the latest blob URL
+    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/pixel%20soccer%20OG-1FolOeZbykSECWnoniMeSi10Dvw3aj.png" // Updated to the latest blob URL
 
   // Fetch the image data
   const imageResponse = await fetch(imageUrl)
