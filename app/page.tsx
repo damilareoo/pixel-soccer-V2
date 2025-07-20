@@ -40,17 +40,31 @@ function BrazilianSoccerGame({
   setGameStarted: (started: boolean) => void
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const requestRef = useRef<number>()
+  const requestRef = useRef<number | null>(null)
 
   // Game state
   const [score, setScore] = useState({ player: 0, cpu: 0 })
   const [timeLeft, setTimeLeft] = useState(GAME_DURATION)
   const [gameOver, setGameOver] = useState(false)
+  const [goalFlash, setGoalFlash] = useState(false) // State for "GOAL!" text
+
+  // Ref to hold the latest score for the game loop
+  const scoreRef = useRef(score)
+  useEffect(() => {
+    scoreRef.current = score
+  }, [score])
+
+  // Ref to hold the latest time left for the game loop
+  const timeLeftRef = useRef(timeLeft)
+  useEffect(() => {
+    timeLeftRef.current = timeLeft
+  }, [timeLeft])
 
   // Game objects using refs to avoid re-renders
-  const playerRef = useRef({ x: 80, y: 120, width: 16, height: 16 })
-  const cpuRef = useRef({ x: 240, y: 120, width: 16, height: 16 })
-  const ballRef = useRef({ x: 160, y: 120, width: 8, height: 8, speedX: 0, speedY: 0 })
+  // Adjusted initial Y positions to account for the new top UI bar
+  const playerRef = useRef({ x: 80, y: 140, width: 16, height: 16 })
+  const cpuRef = useRef({ x: 240, y: 140, width: 16, height: 16 })
+  const ballRef = useRef({ x: 160, y: 140, width: 8, height: 8, speedX: 0, speedY: 0 })
 
   // Input state
   const keysRef = useRef<Record<string, boolean>>({})
@@ -131,6 +145,18 @@ function BrazilianSoccerGame({
     }
   }
 
+  // Reset ball to center
+  const resetBall = () => {
+    ballRef.current = {
+      x: GAME_WIDTH / 2,
+      y: GAME_HEIGHT / 2,
+      width: 8,
+      height: 8,
+      speedX: 0,
+      speedY: 0,
+    }
+  }
+
   // Start the game
   const startGame = () => {
     playSound("whistle")
@@ -140,9 +166,14 @@ function BrazilianSoccerGame({
     setTimeLeft(GAME_DURATION)
 
     // Reset positions
-    playerRef.current = { x: 80, y: 120, width: 16, height: 16 }
-    cpuRef.current = { x: 240, y: 120, width: 16, height: 16 }
-    ballRef.current = { x: 160, y: 120, width: 8, height: 8, speedX: 0, speedY: 0 }
+    playerRef.current = { x: 80, y: 140, width: 16, height: 16 }
+    cpuRef.current = { x: 240, y: 140, width: 16, height: 16 }
+    resetBall()
+
+    // Start game loop if not already running
+    if (!requestRef.current) {
+      requestRef.current = requestAnimationFrame(gameLoop)
+    }
   }
 
   // End the game
@@ -274,12 +305,14 @@ function BrazilianSoccerGame({
 
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
-        if (prev <= 1) {
+        const newTime = prev - 1
+        timeLeftRef.current = newTime // Update ref immediately
+        if (newTime <= 0) {
           clearInterval(timer)
           endGame()
           return 0
         }
-        return prev - 1
+        return newTime
       })
     }, 1000)
 
@@ -498,56 +531,202 @@ function BrazilianSoccerGame({
     }
   }, [isMobile, gameStarted, gameOver, touchJoystickRef.current, kickButtonRef.current])
 
-  // Game loop
-  useEffect(() => {
-    if (!gameStarted || gameOver) return
+  // Draw field
+  const drawField = (ctx: CanvasRenderingContext2D) => {
+    // Draw field with grass pattern
+    const patternCanvas = document.createElement("canvas")
+    patternCanvas.width = 16
+    patternCanvas.height = 16
+    const patternCtx = patternCanvas.getContext("2d")
 
+    if (patternCtx) {
+      patternCtx.fillStyle = COLORS.fieldGreenDark
+      patternCtx.fillRect(0, 0, 16, 16)
+
+      patternCtx.fillStyle = COLORS.fieldGreenLight
+      for (let i = 0; i < 10; i++) {
+        const x = Math.floor(Math.random() * 16)
+        const y = Math.floor(Math.random() * 16)
+        patternCtx.fillRect(x, y, 2, 2)
+      }
+    }
+    const grassPattern = ctx.createPattern(patternCanvas, "repeat")
+
+    if (grassPattern) {
+      ctx.fillStyle = grassPattern
+    } else {
+      ctx.fillStyle = COLORS.fieldGreenDark
+    }
+    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT)
+
+    // Draw field markings
+    ctx.strokeStyle = COLORS.lineWhite
+    ctx.lineWidth = 2
+
+    // Center line
+    ctx.beginPath()
+    ctx.moveTo(GAME_WIDTH / 2, 0)
+    ctx.lineTo(GAME_WIDTH / 2, GAME_HEIGHT)
+    ctx.stroke()
+
+    // Center circle
+    ctx.beginPath()
+    ctx.arc(GAME_WIDTH / 2, GAME_HEIGHT / 2, 30, 0, Math.PI * 2)
+    ctx.stroke()
+
+    // Center spot
+    ctx.fillStyle = COLORS.lineWhite
+    ctx.beginPath()
+    ctx.arc(GAME_WIDTH / 2, GAME_HEIGHT / 2, 3, 0, Math.PI * 2)
+    ctx.fill()
+
+    // Penalty areas (simplified for retro look)
+    ctx.strokeRect(0, GAME_HEIGHT / 2 - 50, 40, 100)
+    ctx.strokeRect(GAME_WIDTH - 40, GAME_HEIGHT / 2 - 50, 40, 100)
+
+    // Penalty spots
+    ctx.beginPath()
+    ctx.arc(30, GAME_HEIGHT / 2, 3, 0, Math.PI * 2)
+    ctx.fill()
+
+    ctx.beginPath()
+    ctx.arc(GAME_WIDTH - 30, GAME_HEIGHT / 2, 3, 0, Math.PI * 2)
+    ctx.fill()
+
+    // Corner arcs (simplified)
+    ctx.beginPath()
+    ctx.arc(0, 0, 10, 0, Math.PI / 2)
+    ctx.stroke()
+
+    ctx.beginPath()
+    ctx.arc(GAME_WIDTH, 0, 10, Math.PI / 2, Math.PI)
+    ctx.stroke()
+
+    ctx.beginPath()
+    ctx.arc(0, GAME_HEIGHT, 10, 0, -Math.PI / 2)
+    ctx.stroke()
+
+    ctx.beginPath()
+    ctx.arc(GAME_WIDTH, GAME_HEIGHT, 10, -Math.PI / 2, -Math.PI)
+    ctx.stroke()
+
+    // Draw goals
+    ctx.fillStyle = COLORS.goalWhite
+    ctx.strokeStyle = COLORS.goalNet
+    ctx.lineWidth = 1
+
+    // Left goal
+    ctx.fillRect(0, GAME_HEIGHT / 2 - GOAL_HEIGHT / 2, GOAL_WIDTH, GOAL_HEIGHT)
+    ctx.strokeRect(0, GAME_HEIGHT / 2 - GOAL_HEIGHT / 2, GOAL_WIDTH, GOAL_HEIGHT)
+
+    // Right goal
+    ctx.fillRect(GAME_WIDTH - GOAL_WIDTH, GAME_HEIGHT / 2 - GOAL_HEIGHT / 2, GOAL_WIDTH, GOAL_HEIGHT)
+    ctx.strokeRect(GAME_WIDTH - GOAL_WIDTH, GAME_HEIGHT / 2 - GOAL_HEIGHT / 2, GOAL_WIDTH, GOAL_HEIGHT)
+
+    // Add goal nets (simple pixel pattern)
+    ctx.fillStyle = COLORS.goalNet
+    const netSpacing = 4 // Smaller spacing for more pixelated net
+    for (let y = GAME_HEIGHT / 2 - GOAL_HEIGHT / 2; y < GAME_HEIGHT / 2 + GOAL_HEIGHT / 2; y += netSpacing) {
+      for (let x = 0; x < GOAL_WIDTH; x += netSpacing) {
+        ctx.fillRect(x, y, 1, 1) // Left goal net
+        ctx.fillRect(GAME_WIDTH - GOAL_WIDTH + x, y, 1, 1) // Right goal net
+      }
+    }
+  }
+
+  // Draw sprite (player or ball)
+  const drawSprite = (
+    ctx: CanvasRenderingContext2D,
+    entity: typeof playerRef.current,
+    color: string,
+    isCircle = false,
+  ) => {
+    ctx.fillStyle = color
+
+    if (isCircle) {
+      // Draw ball with retro details
+      ctx.beginPath()
+      ctx.arc(entity.x + entity.width / 2, entity.y + entity.height / 2, entity.width / 2, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = COLORS.uiBackground // Dark color for seams
+      ctx.fillRect(entity.x + 2, entity.y + 2, 1, 1)
+      ctx.fillRect(entity.x + entity.width - 3, entity.y + 2, 1, 1)
+      ctx.fillRect(entity.x + 2, entity.y + entity.height - 3, 1, 1)
+      ctx.fillRect(entity.x + entity.width - 3, entity.y + entity.height - 3, 1, 1)
+    } else {
+      // Draw pixelated character
+      ctx.fillRect(entity.x, entity.y, entity.width, entity.height)
+
+      // Add details to make it look like a player
+      ctx.fillStyle = COLORS.lineWhite
+      ctx.fillRect(entity.x + 2, entity.y + 2, 2, 2) // Left eye
+      ctx.fillRect(entity.x + entity.width - 4, entity.y + 2, 2, 2) // Right eye
+      ctx.fillRect(entity.x + 4, entity.y + entity.height - 4, 8, 2) // Mouth/Shirt detail
+    }
+  }
+
+  // Draw game UI (scoreboard, timer)
+  const drawGameUI = (ctx: CanvasRenderingContext2D) => {
+    const UI_TOP_OFFSET = 8 // Padding from the top of the canvas
+    const SCOREBOARD_HEIGHT = 24
+    const TIMER_HEIGHT = 20
+    const UI_ELEMENT_GAP = 4 // Gap between scoreboard and timer
+
+    // Player score
+    ctx.fillStyle = COLORS.playerBlue
+    ctx.font = "16px 'Press Start 2P', monospace"
+    ctx.textAlign = "left"
+    ctx.fillText(`P1: ${scoreRef.current.player}`, 10, UI_TOP_OFFSET + 18)
+
+    // CPU score
+    ctx.fillStyle = COLORS.cpuRed
+    ctx.textAlign = "right"
+    ctx.fillText(`CPU: ${scoreRef.current.cpu}`, GAME_WIDTH - 10, UI_TOP_OFFSET + 18)
+
+    // Draw timer with more prominence
+    const TIMER_Y_POSITION = UI_TOP_OFFSET + SCOREBOARD_HEIGHT + UI_ELEMENT_GAP
+
+    // Timer text
+    const minutes = Math.floor(timeLeftRef.current / 60)
+    const seconds = timeLeftRef.current % 60
+    const timeString = `${minutes}:${seconds.toString().padStart(2, "0")}`
+    ctx.fillStyle = timeLeftRef.current <= 30 ? COLORS.warningRed : COLORS.uiText
+    ctx.font = "16px 'Press Start 2P', monospace"
+    ctx.textAlign = "center"
+    ctx.fillText(timeString, GAME_WIDTH / 2, TIMER_Y_POSITION + 15)
+
+    // Add a pulsing effect when time is running out
+    if (timeLeftRef.current <= 10 && Math.floor(Date.now() / 500) % 2 === 0) {
+      ctx.fillStyle = COLORS.warningRed
+      ctx.globalAlpha = 0.3
+      ctx.globalAlpha = 1.0
+    }
+
+    // "GOAL!" flash text
+    if (goalFlash) {
+      ctx.fillStyle = COLORS.warningRed // Use a vibrant color for "GOAL!"
+      ctx.font = "bold 40px 'Press Start 2P', monospace"
+      ctx.textAlign = "center"
+      ctx.fillText("GOAL!", GAME_WIDTH / 2, GAME_HEIGHT / 2)
+    }
+  }
+
+  // Game loop
+  const gameLoop = (timestamp: number) => {
     const canvas = canvasRef.current
     if (!canvas) return
-
-    // Set canvas size
-    canvas.width = GAME_WIDTH
-    canvas.height = GAME_HEIGHT
 
     const ctx = canvas.getContext("2d")
     if (!ctx) return
 
-    // Track frame rate for consistent gameplay across devices
     let lastFrameTime = 0
     const targetFPS = 60
     const frameInterval = 1000 / targetFPS
 
-    // Create grass pattern with device-specific optimizations
-    const createGrassPattern = () => {
-      const patternCanvas = document.createElement("canvas")
-      // Simpler, more blocky pattern for retro feel
-      patternCanvas.width = 16
-      patternCanvas.height = 16
-      const patternCtx = patternCanvas.getContext("2d")
-
-      if (patternCtx) {
-        patternCtx.fillStyle = COLORS.fieldGreenDark
-        patternCtx.fillRect(0, 0, 16, 16)
-
-        // Add some lighter green "pixels"
-        patternCtx.fillStyle = COLORS.fieldGreenLight
-        for (let i = 0; i < 10; i++) {
-          const x = Math.floor(Math.random() * 16)
-          const y = Math.floor(Math.random() * 16)
-          patternCtx.fillRect(x, y, 2, 2) // Small squares for pixel effect
-        }
-      }
-
-      return ctx.createPattern(patternCanvas, "repeat")
-    }
-
-    const grassPattern = createGrassPattern()
-
-    // Game loop function with frame rate control
-    const gameLoop = (timestamp: number) => {
+    const gameLoopInner = (timestamp: number) => {
       const deltaTime = timestamp - lastFrameTime
       if (deltaTime < frameInterval) {
-        requestRef.current = requestAnimationFrame(gameLoop)
+        requestRef.current = requestAnimationFrame(gameLoopInner)
         return
       }
       const speedMultiplier = deltaTime / frameInterval
@@ -555,87 +734,7 @@ function BrazilianSoccerGame({
 
       ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT)
 
-      // Draw field with grass pattern
-      if (grassPattern) {
-        ctx.fillStyle = grassPattern
-      } else {
-        ctx.fillStyle = COLORS.fieldGreenDark // Fallback
-      }
-      ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT)
-
-      // Draw field markings
-      ctx.strokeStyle = COLORS.lineWhite
-      ctx.lineWidth = 2
-
-      // Center line
-      ctx.beginPath()
-      ctx.moveTo(GAME_WIDTH / 2, 0)
-      ctx.lineTo(GAME_WIDTH / 2, GAME_HEIGHT)
-      ctx.stroke()
-
-      // Center circle
-      ctx.beginPath()
-      ctx.arc(GAME_WIDTH / 2, GAME_HEIGHT / 2, 30, 0, Math.PI * 2)
-      ctx.stroke()
-
-      // Center spot
-      ctx.fillStyle = COLORS.lineWhite
-      ctx.beginPath()
-      ctx.arc(GAME_WIDTH / 2, GAME_HEIGHT / 2, 3, 0, Math.PI * 2)
-      ctx.fill()
-
-      // Penalty areas (simplified for retro look)
-      ctx.strokeRect(0, GAME_HEIGHT / 2 - 50, 40, 100)
-      ctx.strokeRect(GAME_WIDTH - 40, GAME_HEIGHT / 2 - 50, 40, 100)
-
-      // Penalty spots
-      ctx.beginPath()
-      ctx.arc(30, GAME_HEIGHT / 2, 3, 0, Math.PI * 2)
-      ctx.fill()
-
-      ctx.beginPath()
-      ctx.arc(GAME_WIDTH - 30, GAME_HEIGHT / 2, 3, 0, Math.PI * 2)
-      ctx.fill()
-
-      // Corner arcs (simplified)
-      ctx.beginPath()
-      ctx.arc(0, 0, 10, 0, Math.PI / 2)
-      ctx.stroke()
-
-      ctx.beginPath()
-      ctx.arc(GAME_WIDTH, 0, 10, Math.PI / 2, Math.PI)
-      ctx.stroke()
-
-      ctx.beginPath()
-      ctx.arc(0, GAME_HEIGHT, 10, 0, -Math.PI / 2)
-      ctx.stroke()
-
-      ctx.beginPath()
-      ctx.arc(GAME_WIDTH, GAME_HEIGHT, 10, -Math.PI / 2, -Math.PI)
-      ctx.stroke()
-
-      // Draw goals
-      ctx.fillStyle = COLORS.goalWhite
-      ctx.strokeStyle = COLORS.goalNet
-      ctx.lineWidth = 1
-
-      // Left goal
-      ctx.fillRect(0, GAME_HEIGHT / 2 - GOAL_HEIGHT / 2, GOAL_WIDTH, GOAL_HEIGHT)
-      ctx.strokeRect(0, GAME_HEIGHT / 2 - GOAL_HEIGHT / 2, GOAL_WIDTH, GOAL_HEIGHT)
-
-      // Right goal
-      ctx.fillRect(GAME_WIDTH - GOAL_WIDTH, GAME_HEIGHT / 2 - GOAL_HEIGHT / 2, GOAL_WIDTH, GOAL_HEIGHT)
-      ctx.strokeRect(GAME_WIDTH - GOAL_WIDTH, GAME_HEIGHT / 2 - GOAL_HEIGHT / 2, GOAL_WIDTH, GOAL_HEIGHT)
-
-      // Add goal nets (simple pixel pattern)
-      ctx.fillStyle = COLORS.goalNet
-      const netSpacing = 4 // Smaller spacing for more pixelated net
-      for (let y = GAME_HEIGHT / 2 - GOAL_HEIGHT / 2; y < GAME_HEIGHT / 2 + GOAL_HEIGHT / 2; y += netSpacing) {
-        for (let x = 0; x < GOAL_WIDTH; x += netSpacing) {
-          ctx.fillRect(x, y, 1, 1) // Left goal net
-          ctx.fillRect(GAME_WIDTH - GOAL_WIDTH + x, y, 1, 1) // Right goal net
-        }
-      }
+      drawField(ctx) // Draw field background and lines
 
       // Update player position based on input
       const player = playerRef.current
@@ -707,15 +806,12 @@ function BrazilianSoccerGame({
         playSound("goal")
         setScore((prev) => {
           const newScore = { ...prev, cpu: prev.cpu + 1 }
-          console.log("CPU scored! New score:", newScore)
+          scoreRef.current = newScore // Update ref immediately
           return newScore
         })
-
-        // Reset ball position
-        ball.x = GAME_WIDTH / 2
-        ball.y = GAME_HEIGHT / 2
-        ball.speedX = 0
-        ball.speedY = 0
+        setGoalFlash(true)
+        setTimeout(() => setGoalFlash(false), 1000) // Show "GOAL!" for 1 second
+        resetBall()
       }
 
       // Check for goals - right goal (Player scores)
@@ -727,15 +823,12 @@ function BrazilianSoccerGame({
         playSound("goal")
         setScore((prev) => {
           const newScore = { ...prev, player: prev.player + 1 }
-          console.log("Player scored! New score:", newScore)
+          scoreRef.current = newScore // Update ref immediately
           return newScore
         })
-
-        // Reset ball position
-        ball.x = GAME_WIDTH / 2
-        ball.y = GAME_HEIGHT / 2
-        ball.speedX = 0
-        ball.speedY = 0
+        setGoalFlash(true)
+        setTimeout(() => setGoalFlash(false), 1000) // Show "GOAL!" for 1 second
+        resetBall()
       }
 
       // Ball collision with walls (sides)
@@ -818,95 +911,28 @@ function BrazilianSoccerGame({
       }
 
       // Draw player (retro blue)
-      ctx.fillStyle = COLORS.playerBlue
-      ctx.fillRect(player.x, player.y, player.width, player.height)
-      // Simple pixelated details for player
-      ctx.fillStyle = COLORS.lineWhite
-      ctx.fillRect(player.x + 2, player.y + 2, 2, 2) // Eye 1
-      ctx.fillRect(player.x + player.width - 4, player.y + 2, 2, 2) // Eye 2
-      ctx.fillRect(player.x + 4, player.y + player.height - 4, 8, 2) // Mouth/Shirt detail
+      drawSprite(ctx, player, COLORS.playerBlue)
 
       // Draw CPU (retro red)
-      ctx.fillStyle = COLORS.cpuRed
-      ctx.fillRect(cpu.x, cpu.y, cpu.width, cpu.height)
-      // Simple pixelated details for CPU
-      ctx.fillStyle = COLORS.lineWhite
-      ctx.fillRect(cpu.x + 2, cpu.y + 2, 2, 2) // Eye 1
-      ctx.fillRect(cpu.x + cpu.width - 4, cpu.y + 2, 2, 2) // Eye 2
-      ctx.fillRect(cpu.x + 4, cpu.y + cpu.height - 4, 8, 2) // Mouth/Shirt detail
+      drawSprite(ctx, cpu, COLORS.cpuRed)
 
       // Draw ball (retro yellow with simple black seams)
-      ctx.fillStyle = COLORS.ballYellow
-      ctx.beginPath()
-      ctx.arc(ball.x + ball.width / 2, ball.y + ball.height / 2, ball.width / 2, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.fillStyle = COLORS.uiBackground // Dark color for seams
-      ctx.fillRect(ball.x + 2, ball.y + 2, 1, 1)
-      ctx.fillRect(ball.x + ball.width - 3, ball.y + 2, 1, 1)
-      ctx.fillRect(ball.x + 2, ball.y + ball.height - 3, 1, 1)
-      ctx.fillRect(ball.x + ball.width - 3, ball.y + ball.height - 3, 1, 1)
+      drawSprite(ctx, ball, COLORS.ballYellow, true)
 
-      // Draw improved scoreboard
-      ctx.fillStyle = COLORS.uiBackground
-      ctx.fillRect(0, 0, GAME_WIDTH, 24)
+      // Draw UI
+      drawGameUI(ctx)
 
-      // Player score area
-      ctx.fillStyle = COLORS.playerBlue
-      ctx.fillRect(GAME_WIDTH / 4 - 30, 0, 60, 24)
-      ctx.fillStyle = COLORS.uiText
-      ctx.font = "16px 'Press Start 2P', monospace" // Use pixel font
-      ctx.textAlign = "center"
-      ctx.fillText(score.player.toString(), GAME_WIDTH / 4, 18)
-
-      // CPU score area
-      ctx.fillStyle = COLORS.cpuRed
-      ctx.fillRect((GAME_WIDTH * 3) / 4 - 30, 0, 60, 24)
-      ctx.fillStyle = COLORS.uiText
-      ctx.textAlign = "center"
-      ctx.fillText(score.cpu.toString(), (GAME_WIDTH * 3) / 4, 18)
-
-      // VS text
-      ctx.fillStyle = COLORS.uiText
-      ctx.font = "12px 'Press Start 2P', monospace"
-      ctx.fillText("VS", GAME_WIDTH / 2, 18)
-
-      // Draw timer with more prominence
-      const minutes = Math.floor(timeLeft / 60)
-      const seconds = timeLeft % 60
-      const timeString = `${minutes}:${seconds.toString().padStart(2, "0")}`
-
-      // Timer background
-      ctx.fillStyle = COLORS.uiBackground
-      ctx.fillRect(GAME_WIDTH / 2 - 30, 30, 60, 24)
-      ctx.strokeStyle = timeLeft <= 30 ? COLORS.warningRed : COLORS.lineWhite // Red when time is running out
-      ctx.lineWidth = 2
-      ctx.strokeRect(GAME_WIDTH / 2 - 30, 30, 60, 24)
-
-      // Timer text
-      ctx.fillStyle = timeLeft <= 30 ? COLORS.warningRed : COLORS.uiText // Red when time is running out
-      ctx.font = "16px 'Press Start 2P', monospace"
-      ctx.textAlign = "center"
-      ctx.fillText(timeString, GAME_WIDTH / 2, 48)
-
-      // Add a pulsing effect when time is running out
-      if (timeLeft <= 10 && Math.floor(Date.now() / 500) % 2 === 0) {
-        ctx.fillStyle = COLORS.warningRed
-        ctx.globalAlpha = 0.3
-        ctx.fillRect(GAME_WIDTH / 2 - 30, 30, 60, 24)
-        ctx.globalAlpha = 1.0
-      }
-
-      requestRef.current = requestAnimationFrame(gameLoop)
+      requestRef.current = requestAnimationFrame(gameLoopInner)
     }
 
-    requestRef.current = requestAnimationFrame(gameLoop)
+    requestRef.current = requestAnimationFrame(gameLoopInner)
 
     return () => {
       if (requestRef.current) {
         cancelAnimationFrame(requestRef.current)
       }
     }
-  }, [gameStarted, gameOver, score, isMobile])
+  }
 
   // Main component render
   return (
@@ -986,8 +1012,6 @@ function BrazilianSoccerGame({
           </div>
 
           <div className="relative z-10 flex flex-col items-center">
-            
-
             {/* Simplified retro ball icon */}
             <div
               className="w-24 sm:w-32 h-24 sm:h-32 rounded-full mb-4 sm:mb-6 flex items-center justify-center shadow-lg"

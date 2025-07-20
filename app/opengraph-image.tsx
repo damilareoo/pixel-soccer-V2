@@ -1,6 +1,4 @@
 import { ImageResponse } from "next/og"
-import { promises as fs } from "fs"
-import path from "path"
 
 // Image metadata
 export const alt = "Pixel Soccer: Brazilian Street Soccer Game"
@@ -13,10 +11,16 @@ export const contentType = "image/png"
 
 // Image generation
 export default async function Image() {
-  // Read the image file from the public directory
-  const imagePath = path.join(process.cwd(), "public", "pixel-soccer-og.png")
-  const imageData = await fs.readFile(imagePath)
-  const base64Image = `data:image/png;base64,${imageData.toString("base64")}`
+  // Directly use the blob URL provided for the image
+  const imageUrl =
+    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/pixel%20soccer%20OG.png-N7eT7FBEbqgdUIAO7jAWZWZmp81aJw.jpeg"
+
+  // Fetch the image data
+  const imageResponse = await fetch(imageUrl)
+  const imageData = await imageResponse.arrayBuffer()
+
+  // Convert ArrayBuffer to base64 string
+  const base64Image = `data:image/png;base64,${Buffer.from(imageData).toString("base64")}`
 
   return new ImageResponse(
     <div
