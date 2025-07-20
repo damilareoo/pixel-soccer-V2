@@ -14,9 +14,9 @@ const GOAL_HEIGHT = 60
 
 // Ball unstuck constants
 const STUCK_THRESHOLD_SPEED = 0.1 // Ball speed below this is considered stuck
-const STUCK_CORNER_DISTANCE = 20 // Distance from corner to consider it stuck
+const STUCK_EDGE_DISTANCE = 20 // Distance from edge to consider it stuck
 const STUCK_DURATION_MS = 500 // How long before we intervene (milliseconds)
-const UNSTUCK_FORCE = 2 // Force to apply to unstuck the ball
+const UNSTUCK_FORCE = 2.5 // Force to apply to unstuck the ball (slightly increased)
 
 // Retro Color Palette
 const COLORS = {
@@ -100,8 +100,7 @@ function BrazilianSoccerGame({
   useEffect(() => {
     const checkMobile = () => {
       const isMobileDevice =
-        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-        window.innerWidth < 768
+        /Android|webOS|iPhone|iPad|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768
       setIsMobile(isMobileDevice)
       setShowTouchControls(isMobileDevice && TOUCH_CONTROLS_ENABLED)
     }
@@ -919,24 +918,23 @@ function BrazilianSoccerGame({
         }
       }
 
-      // Ball unstuck mechanism
+      // Ball unstuck mechanism (improved)
       const isBallSlow = Math.abs(ball.speedX) < STUCK_THRESHOLD_SPEED && Math.abs(ball.speedY) < STUCK_THRESHOLD_SPEED
-      const isBallInCorner =
-        (ball.x < STUCK_CORNER_DISTANCE && ball.y < STUCK_CORNER_DISTANCE) || // Top-left
-        (ball.x + ball.width > GAME_WIDTH - STUCK_CORNER_DISTANCE && ball.y < STUCK_CORNER_DISTANCE) || // Top-right
-        (ball.x < STUCK_CORNER_DISTANCE && ball.y + ball.height > GAME_HEIGHT - STUCK_CORNER_DISTANCE) || // Bottom-left
-        (ball.x + ball.width > GAME_WIDTH - STUCK_CORNER_DISTANCE &&
-          ball.y + ball.height > GAME_HEIGHT - STUCK_CORNER_DISTANCE) // Bottom-right
+      const isBallNearEdge =
+        ball.x < STUCK_EDGE_DISTANCE ||
+        ball.x + ball.width > GAME_WIDTH - STUCK_EDGE_DISTANCE ||
+        ball.y < STUCK_EDGE_DISTANCE ||
+        ball.y + ball.height > GAME_HEIGHT - STUCK_EDGE_DISTANCE
 
-      if (isBallSlow && isBallInCorner) {
+      if (isBallSlow && isBallNearEdge) {
         if (ballStuckTimerRef.current === null) {
           ballStuckTimerRef.current = timestamp
         } else if (timestamp - ballStuckTimerRef.current > STUCK_DURATION_MS) {
-          // Apply force to push ball towards center
+          // Calculate force to push ball towards the center of the field
           const centerX = GAME_WIDTH / 2
           const centerY = GAME_HEIGHT / 2
-          const dxToCenter = centerX - ball.x
-          const dyToCenter = centerY - ball.y
+          const dxToCenter = centerX - (ball.x + ball.width / 2)
+          const dyToCenter = centerY - (ball.y + ball.height / 2)
           const distToCenter = Math.sqrt(dxToCenter * dxToCenter + dyToCenter * dyToCenter) || 1
 
           ball.speedX = (dxToCenter / distToCenter) * UNSTUCK_FORCE
