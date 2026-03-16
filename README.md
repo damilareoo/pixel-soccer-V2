@@ -1,30 +1,52 @@
 # Pixel Soccer V2
 
-*Automatically synced with your [v0.dev](https://v0.dev) deployments*
+A **pixel-art browser soccer game** — fast-paced, retro-styled, playable in your browser.
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/damilares-projects-fc682e5f/v0-pixel-soccer-bc)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev/chat/projects/HCF9qNSxGYQ)
+🎮 **[Play Now](https://v0-pixel-soccer-bc.vercel.app)**
 
-## Overview
+---
 
-This repository will stay in sync with your deployed chats on [v0.dev](https://v0.dev).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.dev](https://v0.dev).
+## What It Is
 
-## Deployment
+A browser-based pixel soccer game with physics, game loop, and canvas rendering. Built with Next.js and TypeScript.
 
-Your project is live at:
+## Tech Stack
 
-**[https://vercel.com/damilares-projects-fc682e5f/v0-pixel-soccer-bc](https://vercel.com/damilares-projects-fc682e5f/v0-pixel-soccer-bc)**
+| Tool | Purpose |
+|------|---------|
+| Next.js | React framework |
+| TypeScript | Type safety |
+| HTML5 Canvas | Game rendering |
+| Tailwind CSS | UI styling |
+| Vercel | Deployment |
 
-## Build your app
+## Getting Started
 
-Continue building your app on:
+```bash
+# 1. Clone the repo
+git clone https://github.com/damilareoo/pixel-soccer-V2.git
+cd pixel-soccer-V2
 
-**[https://v0.dev/chat/projects/HCF9qNSxGYQ](https://v0.dev/chat/projects/HCF9qNSxGYQ)**
+# 2. Install dependencies
+pnpm install
 
-## How It Works
+# 3. Run locally
+pnpm dev
+```
 
-1. Create and modify your project using [v0.dev](https://v0.dev)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+Open [http://localhost:3000](http://localhost:3000) to play.
+
+## Project Structure
+
+```
+pixel-soccer-V2/
+├── app/              # Next.js pages
+├── components/       # Game components (canvas, start/end screens)
+├── hooks/            # Game loop, input, sound hooks
+├── lib/              # Physics engine, render utilities
+└── public/           # Static assets
+```
+
+---
+
+Built by [Damilare Osofisan](https://www.damilareoo.xyz)
