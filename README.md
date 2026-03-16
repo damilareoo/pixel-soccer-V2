@@ -1,8 +1,8 @@
 # Pixel Soccer V2
 
-A **pixel-art browser soccer game** — fast-paced, retro-styled, playable in your browser.
+A pixel-art browser soccer game — fast-paced, retro-styled, playable in your browser.
 
-🎮 **[Play Now](https://v0-pixel-soccer-bc.vercel.app)**
+[Play Now](https://v0-pixel-soccer-bc.vercel.app)
 
 ---
 
